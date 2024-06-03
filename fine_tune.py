@@ -8,22 +8,32 @@ tokenizer = AutoTokenizer.from_pretrained("deepset/xlm-roberta-large-squad2")
 model = AutoModelForQuestionAnswering.from_pretrained("deepset/xlm-roberta-large-squad2")
 
 # Load your dataset
-dataset = load_dataset("json", data_files={"train": "ucr_course_catalog.json"})
+dataset = load_dataset("json", data_files={"train": "catalog.json"})
 
 # Preprocess the dataset
 def preprocess_function(examples):
-    questions = [q["question"] for q in examples["qas"]]
-    contexts = [examples["context"] for _ in examples["qas"]]
-    answers = [a["answers"][0]["text"] for a in examples["qas"]]
-    start_positions = [a["answers"][0]["answer_start"] for a in examples["qas"]]
-    
+    contexts = []
+    questions = []
+    answers = []
+    start_positions = []
+
+    for example in examples['paragraphs']:
+        context = example['context']
+        for qa in example['qas']:
+            contexts.append(context)
+            questions.append(qa['question'])
+            answers.append(qa['answers'][0]['text'])
+            start_positions.append(qa['answers'][0]['answer_start'])
+
     tokenized_examples = tokenizer(
         questions, contexts, truncation=True, padding="max_length", max_length=384
     )
-    
+
     tokenized_examples["start_positions"] = start_positions
-    tokenized_examples["end_positions"] = [start + len(answer) for start, answer in zip(start_positions, answers)]
-    
+    tokenized_examples["end_positions"] = [
+        start + len(answer) for start, answer in zip(start_positions, answers)
+    ]
+
     return tokenized_examples
 
 tokenized_dataset = dataset.map(preprocess_function, batched=True, remove_columns=dataset["train"].column_names)
